@@ -11,6 +11,4 @@ Note that it automatically presses the log-in button once, and expects a pin to 
 ## Collect historical Vermögensübersicht data.user.js
 Tool that saves the table displayed when clicking on `Vermögensübersicht`. It then moves to the previous day until existing data is found or the website reports an error (i.e. the age of your account is reached). Then it logs its table into the console and also appends it below the website.
 
-If you want to import the data on a Google Sheet, please set the Sheet's language settings to `English (United States)`, as the numbers are converted in a format that JSON parsers would accept.
-
-Suggested table header names are (Savings = Liquidität, Stake = Multi Asset): `Row;Date;Savings Delta;Savings Value;Stake Delta;Stake Value;Total Delta;Total Value`, and you can easily compute each **deposit** from their value minus delta.
+If you want to import the data on a Google Sheet, please set the Sheet's language settings to `Deutsch (Deutschland)`, as the dates, numbers and percentages are exported in a human-readable format.
