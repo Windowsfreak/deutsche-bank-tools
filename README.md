@@ -14,7 +14,12 @@ Then you will be presented with two additional buttons right below `Login ausfü
 
 Credentials are no longer stored in LocalStorage. Use your browser's password manager to delete outdated credentials.
 
-## Collect historical Vermögensübersicht data.user.js
-Tool that saves the table displayed when clicking on `Vermögensübersicht`. It then moves to the previous day until existing data is found or the website reports an error (i.e. the age of your account is reached). Then it logs its table into the console and also appends it below the website.
+## Collect historical Vermoegensuebersicht data.user.js
+Tool that saves the table displayed when clicking on `Vermögensübersicht`. It then moves to the previous day until existing data is found or the website reports an error (i.e. the age of your account is reached).
+
+When finished, a button is displayed to navigate to the Display script.
+
+## Display Vermoegensentwicklung table.user.js
+Tool that logs its saved table into the console and also appends it below the website.
 
 If you want to import the data on a Google Sheet, please set the Sheet's language settings to `Deutsch (Deutschland)`, as the dates, numbers and percentages are exported in a human-readable format.
