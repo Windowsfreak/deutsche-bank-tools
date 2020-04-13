@@ -6,6 +6,7 @@
 // @description    Draw Vermögensentwicklung in charts. Requires the Vermögensübersicht script.
 // @description:de Stellt die Vermögensentwicklung in Diagrammen dar. Benötigt das Vermögensübersicht-Skript.
 // @author         Björn Eberhardt
+// @license        Unlicense, http://unlicense.org/
 // @icon           https://www.deutsche-bank.de/dam/deutschebank/de/shared/logo/deutsche_bank_logo_retina.gif
 // @match          https://meine.deutsche-bank.de/trxm/db/invoke/*show.assets.overview.do?showChart=1
 // @match          https://meine.deutsche-bank.de/trxm/db/invoke/*show.assets.overview.do?tab=purchase&showChart=1

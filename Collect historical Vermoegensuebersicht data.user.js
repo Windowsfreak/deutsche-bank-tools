@@ -6,6 +6,7 @@
 // @description    Collects historical Vermögensübersicht data for Vermögensentwicklung.
 // @description:de Sammelt historische Daten aus der Vermögensübersicht für die Vermögensentwicklung.
 // @author         Björn Eberhardt
+// @license        Unlicense, http://unlicense.org/
 // @icon           https://www.deutsche-bank.de/dam/deutschebank/de/shared/logo/deutsche_bank_logo_retina.gif
 // @match          https://meine.deutsche-bank.de/trxm/db/invoke/*show.assets.overview.do
 // @match          https://meine.deutsche-bank.de/trxm/db/invoke/*show.assets.overview.do?tab=purchase
