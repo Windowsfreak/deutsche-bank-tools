@@ -6,12 +6,13 @@
 // @description    Help Google Chrome auto-save account information. Supports multiple credentials.
 // @description:de Google Chrome helfen, das Benutzerkonto zu speichern. Unterstützt mehrere Konten.
 // @author         Björn Eberhardt
-// @license        Unlicense, http://unlicense.org/
+// @license        MIT; https://opensource.org/licenses/MIT
 // @icon           https://www.deutsche-bank.de/dam/deutschebank/de/shared/logo/deutsche_bank_logo_retina.gif
 // @include        https://meine.deutsche-bank.de/trxm/db/
 // @include        https://meine.deutsche-bank.de/trxm/db/init.do
 // @grant          none
 // ==/UserScript==
+// MIT license used to import to OpenUserJS
 
 // Help Google Chrome auto-save account information
 
