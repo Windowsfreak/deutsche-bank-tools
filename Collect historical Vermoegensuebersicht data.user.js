@@ -2,7 +2,7 @@
 // @name           Deutsche Bank Vermögensübersicht
 // @name:de        Deutsche Bank Vermögensübersicht
 // @namespace      https://windowsfreak.de
-// @version        3.0
+// @version        3.1
 // @description    Collects historical Vermögensübersicht data for Vermögensentwicklung.
 // @description:de Sammelt historische Daten aus der Vermögensübersicht für die Vermögensentwicklung.
 // @author         Björn Eberhardt
@@ -41,16 +41,22 @@
                     .replace(new RegExp('\\' + decimalSeparator), '.')
             );
         };
-        const navigateToTable = () => {
+        const navigateTo = target => {
             const url = new URL(window.location.href);
-            url.searchParams.append('showTable', '1');
+            for (let param of url.searchParams.keys()) {
+                if (param.indexOf('show') >= 0) {
+                    url.searchParams.delete(param);
+                }
+            }
+            url.searchParams.append(target, '1');
             window.location.href = url.href;
         };
         const done = () => {
             console.log('done');
             const d = document.createElement('div');
-            d.innerHTML = 'Der Abruf der Daten wurde erfolgreich beendet.<br /><input type="button" value="Tabelle zeigen" class="button nextStep">';
-            d.lastChild.onclick = navigateToTable;
+            d.innerHTML = 'Der Abruf der Daten wurde erfolgreich beendet.<br /> <input type="button" value="Tabelle zeigen" class="button nextStep"> <input type="button" value="Diagramm zeigen" class="button nextStep">';
+            d.getElementsByTagName('input')[0].onclick = () => navigateTo('showTable');
+            d.getElementsByTagName('input')[1].onclick = () => navigateTo('showChart');
             $('assetsOverviewForm').prepend(d);
         };
         const to8Char = parts => `${parts[0]}${parts[1]}${parts[2]}`;

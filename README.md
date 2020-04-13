@@ -20,6 +20,9 @@ Tool that saves the table displayed when clicking on `Vermögensübersicht`. It 
 When finished, a button is displayed to navigate to the Display script.
 
 ## Display Vermoegensentwicklung table.user.js
-Tool that logs its saved table into the console and also appends it below the website.
+Tool that logs its saved table into the console and also appends it on the website.
 
 If you want to import the data on a Google Sheet, please set the Sheet's language settings to `Deutsch (Deutschland)`, as the dates, numbers and percentages are exported in a human-readable format.
+
+## Display Vermoegensentwicklung charts.user.js
+Tool that draws charts for its saved table and allows the user to select different graphs to plot.

@@ -2,7 +2,7 @@
 // @name           Deutsche Bank Vermögensentwicklung Table
 // @name:de        Deutsche Bank Vermögensentwicklung Tabelle
 // @namespace      https://windowsfreak.de
-// @version        1.0
+// @version        1.1
 // @description    Display Vermögensentwicklung in various tables. Requires the Vermögensübersicht script.
 // @description:de Stellt die Vermögensentwicklung in verschiedenen Tabellen dar. Benötigt das Vermögensübersicht-Skript.
 // @author         Björn Eberhardt
@@ -11,8 +11,6 @@
 // @match          https://meine.deutsche-bank.de/trxm/db/invoke/*show.assets.overview.do?tab=purchase&showTable=1
 // @grant          none
 // ==/UserScript==
-
-const navigate = true; // set to false to stop scraping through history
 
 (function() {
     'use strict';
@@ -28,6 +26,16 @@ const navigate = true; // set to false to stop scraping through history
             dep: dep.toFixed(2),
             per: per.toFixed(4)
         });
+        const navigateTo = target => {
+            const url = new URL(window.location.href);
+            for (let param of url.searchParams.keys()) {
+                if (param.indexOf('show') >= 0) {
+                    url.searchParams.delete(param);
+                }
+            }
+            url.searchParams.append(target, '1');
+            window.location.href = url.href;
+        };
         const display = () => {
             // Collect all data from memory, print it in the console and also append it on the page below the table
             const wknref = JSON.parse(localStorage.getItem(`wf_${user}_wkn`) || '{}');
@@ -114,13 +122,19 @@ const navigate = true; // set to false to stop scraping through history
             ].join('\n');
             console.log(str_cbal);
 
+            const d = document.createElement('div');
+            d.innerHTML = 'Der Abruf der Daten wurde erfolgreich beendet.<br /> <input type="button" value="Tabelle zeigen" class="button nextStep"> <input type="button" value="Diagramm zeigen" class="button nextStep">';
+            d.getElementsByTagName('input')[0].onclick = () => navigateTo('showTable');
+            d.getElementsByTagName('input')[1].onclick = () => navigateTo('showChart');
+
             const p = document.createElement('pre');
             p.style.maxWidth = '800px';
             p.style.overflowX = 'auto';
             p.style.lineHeight = '100%';
             p.style.fontSize = '.875em';
             p.textContent = str_gesamtstatistik + '\n\n' + str_cguv + '\n\n' + str_cbal + '\n\n' + str_guv + '\n\n' + str_bal;
-            document.getElementsByClassName('option')[0].prepend(p);
+            document.getElementById('assetsOverviewForm').prepend(p);
+            document.getElementById('assetsOverviewForm').prepend(d);
         };
 
         display();
