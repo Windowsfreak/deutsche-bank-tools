@@ -2,7 +2,7 @@
 // @name           Deutsche Bank Vermögensentwicklung Charts
 // @name:de        Deutsche Bank Vermögensentwicklung Diagramme
 // @namespace      https://windowsfreak.de
-// @version        1.0
+// @version        2.0
 // @description    Draw Vermögensentwicklung in charts. Requires the Vermögensübersicht script.
 // @description:de Stellt die Vermögensentwicklung in Diagrammen dar. Benötigt das Vermögensübersicht-Skript.
 // @author         Björn Eberhardt
@@ -26,6 +26,17 @@
     if (document.getElementsByTagName('h1')[0].innerText === 'Vermögensaufstellung' && window.location.href.indexOf('showChart=1') > -1) {
         let chart, series;
         const user = document.getElementById('customerNumber').childNodes[1].data.trim().replace(/\s/, '_');
+        const users = () => {
+            const accts = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                let match;
+                if (!!(match = key.match(/wf_(.*)_cat/))) {
+                    accts.push(match[1]);
+                }
+            }
+            return accts;
+        };
         const navigateTo = target => {
             const url = new URL(window.location.href);
             for (let param of url.searchParams.keys()) {
@@ -58,18 +69,24 @@
                 per: ds(name + ' Rentabilität', {tooltip: {valueSuffix: '%'}})
             }
         };
-        const push = (obj, date, num) => ['dep', 'bal', 'chg', 'per'].forEach(key => obj[key].data.push([date, num[key]]));
+        const addUp = (data, date, num) => data.reduce((acc, val) => val[0] === date && ((val[1] += num) || true) || acc, 0) || data.push([date, num]);
+        const push = (obj, date, num) => ['dep', 'bal', 'chg', 'per'].forEach(key => addUp(obj[key].data, date, num[key]));
 
-        const init = () => {
-            // Collect all data from memory, collect it in the series and also initialize the HighChart and buttons
-            const wknref = JSON.parse(localStorage.getItem(`wf_${user}_wkn`) || '{}');
-            const cats = JSON.parse(localStorage.getItem(`wf_${user}_cat`) || '{}');
-
+        const load = (accts) => {
+            let wknref = {};
+            let cats = [];
             const days = {};
-            for (let i = 0; i < localStorage.length; i++) {
-                const key = localStorage.key(i);
-                if (key.startsWith(`wf_${user}_stats`)) {
-                    days[key] = JSON.parse(localStorage.getItem(key));
+
+            for (const acct of accts) {
+                // Collect all data from memory, collect it in the series and also initialize the HighChart and buttons
+                wknref = {...wknref, ...JSON.parse(localStorage.getItem(`wf_${acct}_wkn`) || '{}')};
+                cats = [...cats, ...JSON.parse(localStorage.getItem(`wf_${acct}_cat`) || '[]')];
+
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key.startsWith(`wf_${acct}_stats`)) {
+                        days[key] = JSON.parse(localStorage.getItem(key));
+                    }
                 }
             }
             const rows = [];
@@ -111,7 +128,9 @@
                     }
                 }
             });
+        };
 
+        const init = () => {
             Highcharts.setOptions({
                 lang: {
                     decimalPoint: ',',
@@ -138,7 +157,8 @@
             div.innerHTML = `
                 Der Abruf der Daten wurde erfolgreich beendet.<br />
                 <input type="button" value="Tabelle zeigen" class="button nextStep">
-                <input type="button" value="Diagramm zeigen" class="button nextStep"><br /><br />
+                <input type="button" value="Diagramm zeigen" class="button nextStep">
+                <input type="button" value="Konten wählen" class="button nextStep"><br /><br />
                 Zeige
                 <input type="button" value="Einzahlung">
                 <input type="button" value="Kontostand">
@@ -165,9 +185,10 @@
                 () => types(['t', 'b', 'a']),
                 () => types(['cat']),
                 () => types(['wkn'])
-            ].forEach((v, k) => div.getElementsByTagName('input')[k + 2].onclick = v);
+            ].forEach((v, k) => div.getElementsByTagName('input')[k + 3].onclick = v);
             div.getElementsByTagName('input')[0].onclick = () => navigateTo('showTable');
             div.getElementsByTagName('input')[1].onclick = () => navigateTo('showChart');
+            div.getElementsByTagName('input')[2].onclick = () => load(prompt('Konten mit Komma getrennt angeben, zur Auswahl stehen: ' + users().join(','), user).split(','));
             document.getElementById('assetsOverviewForm').prepend(div);
             chart = Highcharts.stockChart('container', {
                 boost: {
@@ -228,6 +249,7 @@
         const attrs = choice => redraw(chosen_attributes = choice) && false;
         const types = choice => redraw(chosen_types = choice) && false;
 
+        load([user]);
         init();
     }
 })();
