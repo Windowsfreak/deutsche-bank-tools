@@ -2,7 +2,7 @@
 // @name           Deutsche Bank Auto-Login
 // @name:de        Deutsche Bank Auto-Login
 // @namespace      https://windowsfreak.de
-// @version        2.1
+// @version        2.2
 // @description    Help Google Chrome auto-save account information. Supports multiple credentials.
 // @description:de Google Chrome helfen, das Benutzerkonto zu speichern. Unterstützt mehrere Konten.
 // @author         Björn Eberhardt
@@ -46,7 +46,7 @@
             return navigator.credentials.create({password: {
                     id: user,
                     password: d[3],
-                    iconURL: new URL('/trxmcontent/20.06.0.0_PR07-f73e406b3ee/global/default/images/logo_db.gif', document.baseURI).href
+                    iconURL: new URL('https://www.deutsche-bank.de/dam/deutschebank/de/shared/logo/deutsche_bank_logo_retina.gif', document.baseURI).href
                 }})
                 .then(p => navigator.credentials.store(p))
                 .then(submit);
