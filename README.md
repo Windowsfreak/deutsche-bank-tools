@@ -12,10 +12,13 @@ Then you will be presented with two additional buttons right below `Login ausfü
 
 `Konto auswählen` to repeat account selection and `Konto hinzufügen` to add another account.
 
-Credentials are no longer stored in LocalStorage. Use your browser's password manager to delete outdated credentials.
+Use the browser's password manager to delete credentials that are no longer needed.
+
+Note: If your browser doesn't support the Credentials API, your details are instead stored in LocalStorage.
+In this case, a light-red notification will appear in the login screen.
 
 ## Collect historical Vermoegensuebersicht data.user.js
-Tool that saves the table displayed when clicking on `Vermögensübersicht`. It then moves to the previous day until existing data is found or the website reports an error (i.e. the age of your account is reached).
+Tool that saves the table displayed when clicking on `Vermögensübersicht`. It then moves to the previous day until existing data is found, or the website reports an error (i.e. the age of your account is reached).
 
 When finished, a button is displayed to navigate to the Display script.
 

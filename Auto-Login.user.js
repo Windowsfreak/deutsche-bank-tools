@@ -2,9 +2,9 @@
 // @name           Deutsche Bank Auto-Login
 // @name:de        Deutsche Bank Auto-Login
 // @namespace      https://windowsfreak.de
-// @version        2.2
-// @description    Help Google Chrome auto-save account information. Supports multiple credentials.
-// @description:de Google Chrome helfen, das Benutzerkonto zu speichern. Unterstützt mehrere Konten.
+// @version        2.3
+// @description    Help Google Chrome and Mozilla Firefox auto-save account information. Supports multiple credentials.
+// @description:de Google Chrome und Mozilla Firefox helfen, das Benutzerkonto zu speichern. Unterstützt mehrere Konten.
 // @author         Björn Eberhardt
 // @license        MIT; https://opensource.org/licenses/MIT
 // @icon           https://www.deutsche-bank.de/dam/deutschebank/de/shared/logo/deutsche_bank_logo_retina.gif
@@ -14,12 +14,13 @@
 // ==/UserScript==
 // MIT license used to import to OpenUserJS
 
-// Help Google Chrome auto-save account information
+// Help Google Chrome and Mozilla Firefox auto-save account information
 
 (function() {
     'use strict';
 
     if (window.location.href.indexOf('https://meine.deutsche-bank.de/trxm/db/') > -1) {
+        const hasPasswordStore = typeof PasswordCredential === "function";
         const $ = name => document.getElementsByName(name)[0];
         const $c = (name, pos = 0) => document.getElementsByClassName(name)[pos];
         const submit = () => // Caps-Lock is a hidden error message
@@ -43,17 +44,56 @@
                 return alert('Fehler: Die eingegebenen Felder dürfen nur aus Ziffern bestehen.');
             }
             fillForm(d);
-            return navigator.credentials.create({password: {
-                    id: user,
-                    password: d[3],
-                    iconURL: new URL('https://www.deutsche-bank.de/dam/deutschebank/de/shared/logo/deutsche_bank_logo_retina.gif', document.baseURI).href
-                }})
-                .then(p => navigator.credentials.store(p))
-                .then(submit);
+            if (hasPasswordStore) {
+                return navigator.credentials.create({password: {
+                        id: user,
+                        password: d[3],
+                        iconURL: new URL('https://www.deutsche-bank.de/dam/deutschebank/de/shared/logo/deutsche_bank_logo_retina.gif', document.baseURI).href
+                    }})
+                    .then(p => navigator.credentials.store(p))
+                    .then(submit);
+            } else {
+                localStorage.setItem(`wf_user_${user}`, d[3])
+                submit();
+            }
         };
         const login = async () => {
-            let p = await navigator.credentials.get({password: true});
-            return await p && fillForm([...fromUser(p.id), p.password]) && submit();
+            if (hasPasswordStore) {
+                let p = await navigator.credentials.get({password: true});
+                return await p && fillForm([...fromUser(p.id), p.password]) && submit();
+            } else {
+                if ($c('acct-choice')) {
+                    alert('Bitte das gewünschte Konto oben auswählen.');
+                    return;
+                }
+                const accts = [];
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    let match;
+                    if (!!(match = key.match(/wf_user_(.*)/))) {
+                        if (regex.test(match[1])) {
+                            accts.push(match[1]);
+                        }
+                    }
+                }
+                const t = $c('roll layout');
+                if (accts.length > 0) {
+                    const x = document.createElement('div');
+                    x.innerHTML = `Gewünschtes Konto: &nbsp; <select id="acct" class="acct-choice">
+                        ${accts.map(k => `<option value="${k}">${k}</option>`)}
+                    </select>`;
+                    t.parentNode.insertBefore(x, t);
+                    x.style.cssText = 'font-weight: bold; font-size: 1.4em';
+                    const a = $c('acct-choice')
+                    a.onclick = () => {
+                        fillForm([...fromUser(a.value), localStorage.getItem(`wf_user_${a.value}`)]) && submit();
+                    }
+                }
+                const y = document.createElement('div');
+                y.innerHTML = `Hinweis: Ihr Browser unterstützt die Credentials API nicht, diese würde die Sicherheit des Auto-Logins erhöhen.`;
+                t.parentNode.insertBefore(y, t);
+                y.style.cssText = 'color: salmon';
+            }
         };
         const load = () => {
             $c('nextStep').parentNode.innerHTML +=
