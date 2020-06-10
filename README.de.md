@@ -4,7 +4,7 @@ Greasemonkey-Werkzeuge, um den Zugriff auf **Deutsche Bank OnlineBanking** zu au
 ## Auto-Login.user.js
 Werkzeug, das Kontozugänge im Passwortmanager des Browsers sichert und lädt.
 
-Bei genau einem Konto, wird es sich automatisch einloggen. *Dies kann abgebrochen werden, indem mehrfach die `Escape`-Taste gedrückt wird.*
+Bei genau einem Konto wird es sich automatisch einloggen. *Dies kann abgebrochen werden, indem mehrfach die `Escape`-Taste gedrückt wird.*
 
 Mit mehreren Konten wird der Browser eine Auswahl anbieten, mit Möglichkeit zum `Abbrechen`.
 

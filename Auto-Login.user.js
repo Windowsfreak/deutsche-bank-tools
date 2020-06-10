@@ -2,7 +2,7 @@
 // @name           Deutsche Bank Auto-Login
 // @name:de        Deutsche Bank Auto-Login
 // @namespace      https://windowsfreak.de
-// @version        2.3
+// @version        2.4
 // @description    Help Google Chrome and Mozilla Firefox auto-save account information. Supports multiple credentials.
 // @description:de Google Chrome und Mozilla Firefox helfen, das Benutzerkonto zu speichern. Unterstützt mehrere Konten.
 // @author         Björn Eberhardt
@@ -78,6 +78,7 @@
                 }
                 const t = $c('roll layout');
                 if (accts.length > 0) {
+                    const getAcctData = value => [...fromUser(value), localStorage.getItem(`wf_user_${value}`)]
                     const x = document.createElement('div');
                     x.innerHTML = `Gewünschtes Konto: &nbsp; <select id="acct" class="acct-choice">
                         ${accts.map(k => `<option value="${k}">${k}</option>`)}
@@ -85,9 +86,10 @@
                     t.parentNode.insertBefore(x, t);
                     x.style.cssText = 'font-weight: bold; font-size: 1.4em';
                     const a = $c('acct-choice')
-                    a.onclick = () => {
-                        fillForm([...fromUser(a.value), localStorage.getItem(`wf_user_${a.value}`)]) && submit();
+                    a.onchange = () => {
+                        fillForm(getAcctData(a.value)) && submit();
                     }
+                    fillForm(getAcctData(a.value))
                 }
                 const y = document.createElement('div');
                 y.innerHTML = `Hinweis: Ihr Browser unterstützt die Credentials API nicht, diese würde die Sicherheit des Auto-Logins erhöhen.`;
