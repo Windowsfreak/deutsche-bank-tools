@@ -31,7 +31,7 @@
         link.style.textDecoration = 'underline'
     } else {
         const navigate = true // set to false to stop scraping through history
-        const user = $('customerNumber').childNodes[1].data.trim().replace(/\s/, '_')
+        const user = $('customerNumber').childNodes[1].data.replace(/^\s+|\s+$/g, '').replace(/\s/g, '_')
         const reportDateFields = ['reportDateYear', 'reportDateMonth', 'reportDateDay']
         const parseLocaleNumber = stringNumber => {
             const thousandSeparator = (1111).toLocaleString().replace(/1/g, '')
@@ -106,8 +106,9 @@
                     db.onupgradeneeded = function(event) {
                         const db = event.target.result
                         // Create object stores and indexes
-                        db.createObjectStore('daily', { keyPath: ['user', 'd_str'] })
+                        const daily = db.createObjectStore('daily', { keyPath: ['user', 'd_str'] })
                         db.createObjectStore('lists')
+                        daily.createIndex('user_dstr', ['user', 'd_str'])
                     }
                     db.onsuccess = event => resolve(event.target.result)
                     db.onerror = event => {

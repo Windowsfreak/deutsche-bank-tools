@@ -2,7 +2,7 @@
 // @name           Deutsche Bank Vermögensentwicklung Charts
 // @name:de        Deutsche Bank Vermögensentwicklung Diagramme
 // @namespace      https://windowsfreak.de
-// @version        2.1
+// @version        4.0
 // @description    Draw Vermögensentwicklung in charts. Requires the Vermögensübersicht script.
 // @description:de Stellt die Vermögensentwicklung in Diagrammen dar. Benötigt das Vermögensübersicht-Skript.
 // @author         Björn Eberhardt
@@ -24,18 +24,98 @@
 
     // Navigated to Vermögensaufstellung?
     if (document.getElementsByTagName('h1')[0].innerText === 'Vermögensaufstellung' && window.location.href.indexOf('showChart=1') > -1) {
-        let chart, series
-        const user = document.getElementById('customerNumber').childNodes[1].data.trim().replace(/\s/, '_')
-        const users = () => {
-            const accts = []
-            for (let i = 0; i < localStorage.length; i++) {
-                const key = localStorage.key(i)
-                let match
-                if (!!(match = key.match(/wf_(.*)_cat/))) {
-                    accts.push(match[1])
+        let globalDb
+        const promisify = request =>
+            new Promise((resolve, reject) => {
+                request.onsuccess = event => resolve(event.target.result)
+                request.onerror = event => reject(event.target.error)
+            })
+
+        const getDb = () => {
+            return new Promise((resolve, reject) => {
+                const db = indexedDB.open('wf', 1)
+                db.onupgradeneeded = function(event) {
+                    const db = event.target.result
+                    // Create object stores and indexes
+                    const daily = db.createObjectStore('daily', { keyPath: ['user', 'd_str'] })
+                    db.createObjectStore('lists')
+                    daily.createIndex('user_dstr', ['user', 'd_str'])
                 }
-            }
-            return accts
+                db.onsuccess = event => resolve(event.target.result)
+                db.onerror = event => {
+                    console.error(event.target.error)
+                    reject(new Error('Error opening database'))
+                }
+            })
+        }
+
+        const iterateKeysWithFilter = (objectStore, filterFn) => {
+            return new Promise((resolve, reject) => {
+                const keys = []
+                const request = objectStore.openCursor()
+
+                request.onsuccess = event => {
+                    const cursor = event.target.result
+                    if (cursor) {
+                        const needle = filterFn(cursor.key)
+                        if (needle) keys.push(needle)
+                        cursor.continue()
+                    } else resolve(keys)
+                }
+                request.onerror = event => reject(new Error('Error iterating over object store keys'));
+            })
+        }
+
+        const getData = (db, acct) => {
+            globalDb = db
+            const transaction = db.transaction(['daily', 'lists'], 'readonly')
+            const daily = transaction.objectStore('daily')
+            const lists = transaction.objectStore('lists')
+            const idx = daily.index('user_dstr')
+            const statsKeyRange = IDBKeyRange.bound([acct, ''], [acct, '\uffff'], false, false)
+
+            const data = {
+                wkn: {},
+                cat: [],
+                daily: {}
+            };
+
+            const promiseWkn = promisify(lists.get(`${acct}_wkn`))
+                .then(wkn => data.wkn = wkn || {})
+
+            const promiseCat = promisify(lists.get(`${acct}_cat`))
+                .then(cat => data.cat = cat || [])
+
+            const promiseDaily = new Promise((resolve, reject) => {
+                const request = idx.openCursor(statsKeyRange)
+                request.onsuccess = event => {
+                    const cursor = event.target.result
+                    if (cursor) {
+                        data.daily[cursor.primaryKey] = cursor.value;
+                        cursor.continue();
+                    } else resolve(); // Resolve the promise when there are no more records
+                }
+                request.onerror = function(event) {
+                    console.error(event.target.error)
+                    reject(new Error('Error retrieving user statistics'));
+                }
+            })
+
+            return Promise.all([promiseWkn, promiseCat, promiseDaily]).then(() => data)
+        }
+
+        let chart, series
+        const user = document.getElementById('customerNumber').childNodes[1].data.replace(/^\s+|\s+$/g, '').replace(/\s/g, '_')
+        const users = () => {
+            const transaction = globalDb.transaction('lists', 'readonly')
+            const lists = transaction.objectStore('lists')
+
+            const filterFn = key => {
+                const match = key.match(/^(.*)_cat$/)
+                if (match) return match[1]
+                return null
+            };
+            return iterateKeysWithFilter(lists, filterFn)
         }
         const navigateTo = target => {
             const url = new URL(window.location.href)
@@ -74,60 +154,51 @@
         const push = (obj, date, num) => ['dep', 'bal', 'chg', 'per'].forEach(key => addUp(obj[key].data, date, num[key]))
 
         const load = (accts) => {
-            let wknref = {}
-            let cats = []
-            const days = {}
+            const acctsPromises = getDb().then(db => Promise.all(accts.map(acct => getData(db, acct))))
 
-            for (const acct of accts) {
-                // Collect all data from memory, collect it in the series and also initialize the HighChart and buttons
-                wknref = {...wknref, ...JSON.parse(localStorage.getItem(`wf_${acct}_wkn`) || '{}')}
-                cats = [...cats, ...JSON.parse(localStorage.getItem(`wf_${acct}_cat`) || '[]')]
+            return acctsPromises.then(acctsData => {
+                const wknref = acctsData.reduce((result, acctData) => ({...result, ...acctData.wkn}), {})
+                const cats = acctsData.reduce((result, acctData) => [...result, ...acctData.cat], [])
+                const days = acctsData.reduce((result, acctData) => ({...result, ...acctData.daily}), {})
 
-                for (let i = 0; i < localStorage.length; i++) {
-                    const key = localStorage.key(i)
-                    if (key.startsWith(`wf_${acct}_stats`)) {
-                        days[key] = JSON.parse(localStorage.getItem(key))
+                const rows = Object.keys(days).sort().map(key => days[key]);
+
+                series = {
+                    t: prefixed_ds('Gesamt'),
+                    b: prefixed_ds('Liquidität'),
+                    a: prefixed_ds('Depot'),
+                    cat: {},
+                    wkn: {}
+                }
+
+                for (const k in cats) {
+                    if (k != 'Liquidität') {
+                        series.cat[cats[k]] = prefixed_ds(cats[k])
                     }
                 }
-            }
-            const rows = []
-            Object.keys(days).sort().forEach(key => rows.push(days[key]))
-
-            series = {
-                t: prefixed_ds('Gesamt'),
-                b: prefixed_ds('Liquidität'),
-                a: prefixed_ds('Depot'),
-                cat: {},
-                wkn: {}
-            }
-
-            for (const k in cats) {
-                if (k != 'Liquidität') {
-                    series.cat[cats[k]] = prefixed_ds(cats[k])
+                for (const k in wknref) {
+                    const v = wknref[k]
+                    series.wkn[k] = prefixed_ds(k + ' - ' + v)
                 }
-            }
-            for (const k in wknref) {
-                const v = wknref[k]
-                series.wkn[k] = prefixed_ds(k + ' - ' + v)
-            }
 
-            rows.forEach(row => {
-                const segments = /(\d{4})(\d{2})(\d{2})/.exec(row.d_str)
-                const date = Date.parse(segments[1] + '-' + segments[2] + '-' + segments[3])
-                const t = getNum(row.tbal, row.tchg)
-                const b = getNum(row.bbal, row.bchg)
-                const a = getNum(row.tbal - row.bbal, row.tchg - row.bchg)
-                push(series.t, date, t)
-                push(series.b, date, b)
-                push(series.a, date, a)
-                for (let key in row.wkns) {
-                    push(series.wkn[key], date, getNum(row.wkns[key].bal, row.wkns[key].chg))
-                }
-                for (let key in row.cats) {
-                    if (key != 'Liquidität') {
-                        push(series.cat[key], date, getNum(row.cats[key].bal, row.cats[key].chg))
+                rows.forEach(row => {
+                    const segments = /(\d{4})(\d{2})(\d{2})/.exec(row.d_str)
+                    const date = Date.parse(segments[1] + '-' + segments[2] + '-' + segments[3])
+                    const t = getNum(row.tbal, row.tchg)
+                    const b = getNum(row.bbal, row.bchg)
+                    const a = getNum(row.tbal - row.bbal, row.tchg - row.bchg)
+                    push(series.t, date, t)
+                    push(series.b, date, b)
+                    push(series.a, date, a)
+                    for (let key in row.wkns) {
+                        push(series.wkn[key], date, getNum(row.wkns[key].bal, row.wkns[key].chg))
                     }
-                }
+                    for (let key in row.cats) {
+                        if (key != 'Liquidität') {
+                            push(series.cat[key], date, getNum(row.cats[key].bal, row.cats[key].chg))
+                        }
+                    }
+                })
             })
         }
 
@@ -174,22 +245,23 @@
                 <input type="button" value="Kategorien">
                 <input type="button" value="Fonds">
                 <div id="container" style="height: 800px"></div>`
-                [
-                    () => attrs(['dep']),
-                    () => attrs(['bal']),
-                    () => attrs(['dep', 'bal']),
-                    () => attrs(['chg']),
-                    () => attrs(['per']),
-                    () => types(['t']),
-                    () => types(['b']),
-                    () => types(['a']),
-                    () => types(['t', 'b', 'a']),
-                    () => types(['cat']),
-                    () => types(['wkn'])
-                ].forEach((v, k) => div.getElementsByTagName('input')[k + 3].onclick = v)
+            const inputElements = Array.from(div.getElementsByTagName('input'));
+            [
+                () => attrs(['dep']),
+                () => attrs(['bal']),
+                () => attrs(['dep', 'bal']),
+                () => attrs(['chg']),
+                () => attrs(['per']),
+                () => types(['t']),
+                () => types(['b']),
+                () => types(['a']),
+                () => types(['t', 'b', 'a']),
+                () => types(['cat']),
+                () => types(['wkn'])
+            ].forEach((v, k) => inputElements[k + 3].onclick = v)
             div.getElementsByTagName('input')[0].onclick = () => navigateTo('showTable')
             div.getElementsByTagName('input')[1].onclick = () => navigateTo('showChart')
-            div.getElementsByTagName('input')[2].onclick = () => load(prompt('Konten mit Komma getrennt angeben, zur Auswahl stehen: ' + users().join(','), user).split(','))
+            div.getElementsByTagName('input')[2].onclick = () => users().then(accts => load(prompt('Konten mit Komma getrennt angeben, zur Auswahl stehen: ' + accts.join(','), user).split(',')))
             document.getElementById('assetsOverviewForm').prepend(div)
             chart = Highcharts.stockChart('container', {
                 boost: {
@@ -211,7 +283,6 @@
                     enabled: true
                 }
             })
-            redraw()
         }
 
         let chosen_attributes = ['dep', 'bal']
@@ -250,7 +321,7 @@
         const attrs = choice => redraw(chosen_attributes = choice) && false
         const types = choice => redraw(chosen_types = choice) && false
 
-        load([user])
         init()
+        load([user]).then(() => redraw())
     }
 })()
