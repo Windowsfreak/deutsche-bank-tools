@@ -2,7 +2,7 @@
 // @name           Deutsche Bank Vermögensübersicht
 // @name:de        Deutsche Bank Vermögensübersicht
 // @namespace      https://windowsfreak.de
-// @version        3.2
+// @version        4.0
 // @description    Collects historical Vermögensübersicht data for Vermögensentwicklung.
 // @description:de Sammelt historische Daten aus der Vermögensübersicht für die Vermögensentwicklung.
 // @author         Björn Eberhardt
@@ -30,7 +30,7 @@
         link.style.fontWeight = 'bold'
         link.style.textDecoration = 'underline'
     } else {
-        const navigate = true; // set to false to stop scraping through history
+        const navigate = true // set to false to stop scraping through history
         const user = $('customerNumber').childNodes[1].data.trim().replace(/\s/, '_')
         const reportDateFields = ['reportDateYear', 'reportDateMonth', 'reportDateDay']
         const parseLocaleNumber = stringNumber => {
@@ -41,8 +41,8 @@
                 stringNumber
                     .replace(new RegExp('\\' + thousandSeparator, 'g'), '')
                     .replace(new RegExp('\\' + decimalSeparator), '.')
-            );
-        };
+            )
+        }
         const navigateTo = target => {
             const url = new URL(window.location.href)
             for (let param of url.searchParams.keys()) {
@@ -52,7 +52,7 @@
             }
             url.searchParams.append(target, '1')
             window.location.href = url.href
-        };
+        }
         const done = () => {
             console.log('done')
             const d = document.createElement('div')
@@ -89,50 +89,113 @@
             const today = new Date(Date.UTC(d[0], d[1] - 1, d[2], 0, 0, 0, 0))
             const todayStr = to8Char(d)
 
-            const wknref = JSON.parse(localStorage.getItem(`wf_${user}_wkn`) || '{}')
-            const catref = JSON.parse(localStorage.getItem(`wf_${user}_cat`) || '[]')
-            const wkns = {}
-            const cats = {}
-
-            let bbal = 0, bchg = 0
-            $qsa('#lkn_detail').forEach(e => {
-                const wkn = e.title.split(' ')[1]
-                wknref[wkn] = e.innerText
-                const cat = getCat(e.closest('tr'))
-                const bal = parseNum(e.closest('tr').querySelector('td[headers=\'col08a\']'))
-                const chg = parseNum(e.closest('tr').querySelector('td[headers=\'col07a\']'))
-                wkns[wkn] = {cat, wkn, bal, chg}
-            })
-            $qsa('#subTotal01').forEach(e => {
-                const cat = e.innerText
-                catref.includes(cat) || catref.push(cat)
-                const bal = parseNum(e.closest('tr').querySelector('th[headers=\'subTotal01 col08a\']'))
-                const chg = parseNum(e.closest('tr').querySelector('th[headers=\'subTotal01 col07a\']'))
-                if (cat === 'Liquidität') {
-                    bbal = bal
-                    bchg = chg
-                }
-                cats[cat] = {cat, bal, chg}
-            })
-            const tbal = parseNum(document.querySelector('td[headers=\'textTotal col08a\']'))
-            const tchg = parseNum(document.querySelector('td[headers=\'textTotal col07a\']'))
-            const day = {d_str: todayStr, d: formatDate(today), tbal, tchg, bbal, bchg, wkns, cats}
-
-            localStorage.setItem(`wf_${user}_wkn`, JSON.stringify(wknref))
-            localStorage.setItem(`wf_${user}_cat`, JSON.stringify(catref))
-            localStorage.setItem(`wf_${user}_stats_${todayStr}`, JSON.stringify(day))
-
             // Do we have data from yesterday?
             const yesterday = new Date(today)
             yesterday.setDate(yesterday.getDate() - 1)
             const yesterdayStr = to8Char(parseDate(yesterday))
 
-            // If not, request it.
-            if (navigate && !localStorage.getItem(`wf_${user}_stats_${yesterdayStr}`)) {
-                setDate(parseDate(yesterday))
-            } else {
-                done()
+            const promisify = request =>
+                new Promise((resolve, reject) => {
+                    request.onsuccess = event => resolve(event.target.result)
+                    request.onerror = event => reject(event.target.error)
+                })
+
+            const getDb = () => {
+                return new Promise((resolve, reject) => {
+                    const db = indexedDB.open('wf', 1)
+                    db.onupgradeneeded = function(event) {
+                        const db = event.target.result
+                        // Create object stores and indexes
+                        db.createObjectStore('daily', { keyPath: ['user', 'd_str'] })
+                        db.createObjectStore('lists')
+                    }
+                    db.onsuccess = event => resolve(event.target.result)
+                    db.onerror = event => {
+                        console.error(event)
+                        reject(new Error('Error opening database'))
+                    }
+                })
             }
+            const getData = db => {
+                return new Promise((resolve, reject) => {
+                    const transaction = db.transaction(['daily', 'lists'], 'readonly')
+                    const lists = transaction.objectStore('lists')
+                    const daily = transaction.objectStore('daily')
+
+                    const resultObj = {
+                        db
+                    }
+                    promisify(lists.get(`${user}_wkn`)).then(wkn => {
+                        if (!wkn) wkn = {}
+                        resultObj.wkn = wkn
+                        return promisify(lists.get(`${user}_cat`))
+                    }).then(cat => {
+                        if (!cat) cat = []
+                        resultObj.cat = cat
+                        return promisify(daily.get([user, yesterdayStr]))
+                    }).then(yesterday => {
+                        resultObj.yesterday = yesterday
+                        resolve(resultObj)
+                    }).catch(error => {
+                        console.error(error)
+                        reject(new Error('Error retrieving database entries'))
+                    })
+                })
+            }
+            const setData = data => {
+                return new Promise((resolve, reject) => {
+                    const transaction = data.db.transaction(['daily', 'lists'], 'readwrite')
+                    const lists = transaction.objectStore('lists')
+                    const daily = transaction.objectStore('daily')
+                    promisify(lists.put(data.wkn, `${user}_wkn`)).then(() => {
+                        return promisify(lists.put(data.cat, `${user}_cat`))
+                    }).then(() => {
+                        return promisify(daily.put(data.day))
+                    }).then(() => {
+                        resolve()
+                    }).catch(error => {
+                        console.error(error)
+                        reject(new Error('Error storing database entries'))
+                    })
+                })
+            }
+
+            getDb().then(getData).then(data => {
+                const wkns = {}
+                const cats = {}
+
+                let bbal = 0, bchg = 0
+                $qsa('#lkn_detail').forEach(e => {
+                    const wkn = e.title.split(' ')[1]
+                    data.wkn[wkn] = e.innerText
+                    const cat = getCat(e.closest('tr'))
+                    const bal = parseNum(e.closest('tr').querySelector('td[headers=\'col08a\']'))
+                    const chg = parseNum(e.closest('tr').querySelector('td[headers=\'col07a\']'))
+                    wkns[wkn] = {cat, wkn, bal, chg}
+                })
+                $qsa('#subTotal01').forEach(e => {
+                    const cat = e.innerText
+                    data.cat.includes(cat) || data.cat.push(cat)
+                    const bal = parseNum(e.closest('tr').querySelector('th[headers=\'subTotal01 col08a\']'))
+                    const chg = parseNum(e.closest('tr').querySelector('th[headers=\'subTotal01 col07a\']'))
+                    if (cat === 'Liquidität') {
+                        bbal = bal
+                        bchg = chg
+                    }
+                    cats[cat] = {cat, bal, chg}
+                })
+                const tbal = parseNum(document.querySelector('td[headers=\'textTotal col08a\']'))
+                const tchg = parseNum(document.querySelector('td[headers=\'textTotal col07a\']'))
+                data.day = {user, d_str: todayStr, d: formatDate(today), tbal, tchg, bbal, bchg, wkns, cats}
+
+                setData(data).then(() => {
+                    if (navigate && !data.yesterday) {
+                        setDate(parseDate(yesterday))
+                    } else {
+                        done()
+                    }
+                })
+            })
         } else {
             done()
         }
